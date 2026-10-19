@@ -168,6 +168,18 @@ static inline void efa_hmem_info_check_p2p_support_cuda(struct efa_hmem_info *in
 	uint64_t dmabuf_offset;
 	bool own_cuda_ctx = false;
 
+	/*
+	 * Proof of concept only, not for upstream: behave as on an instance whose EFA
+	 * device cannot register CUDA memory (e.g. g6), where this probe fails and
+	 * every CUDA transfer is copied through host bounce buffers.
+	 */
+	if (getenv("FI_EFA_POC_NO_CUDA_P2P")) {
+		EFA_WARN(FI_LOG_CORE,
+			 "FI_EFA_POC_NO_CUDA_P2P is set: treating CUDA memory as not reachable by the EFA device\n");
+		info->p2p_supported_by_device = false;
+		return;
+	}
+
 	cu_ret = ofi_cuCtxGetCurrent(&cu_ctx);
 	if (cu_ret != CUDA_SUCCESS) {
 		info->initialized = false;
