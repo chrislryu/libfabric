@@ -523,8 +523,20 @@ static void efa_rdm_mr_hmem_setup(struct efa_rdm_mr *efa_rdm_mr,
 		efa_rdm_mr->device = attr->device.cuda;
 		efa_rdm_mr->needs_sync = true;
 
-		if (!(flags & FI_MR_DMABUF) && cuda_is_gdrcopy_enabled()) {
-			struct iovec mr_iov = *attr->mr_iov;
+		/*
+		 * gdrcopy pins by virtual address. A dmabuf registration names the
+		 * address the application maps the region at (base_addr + offset), so
+		 * it keeps the gdrcopy handle too; without an address it goes without.
+		 */
+		struct iovec mr_iov = { 0 };
+
+		if (flags & FI_MR_DMABUF) {
+			if (attr->dmabuf->base_addr)
+				ofi_mr_get_iov_from_dmabuf(&mr_iov, attr->dmabuf, 1);
+		} else
+			mr_iov = *attr->mr_iov;
+
+		if (mr_iov.iov_base && cuda_is_gdrcopy_enabled()) {
 			int err = ofi_hmem_dev_register(FI_HMEM_CUDA, mr_iov.iov_base, mr_iov.iov_len,
 							(uint64_t *)&efa_rdm_mr->hmem_data);
 			efa_rdm_mr->flags |= OFI_HMEM_DATA_DEV_REG_HANDLE;
