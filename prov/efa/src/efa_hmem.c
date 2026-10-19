@@ -596,9 +596,10 @@ int efa_copy_from_hmem(void *desc, void *dest, const void *src, size_t size)
 		hmem_data = (uint64_t)efa_rdm_mr->hmem_data;
 	}
 
-	if (flags & OFI_HMEM_DATA_DEV_REG_HANDLE) {
+	/* gdrcopy reads device memory slowly in bulk; see efa_rdm_pke_copy_from_hmem_iov() */
+	if ((flags & OFI_HMEM_DATA_DEV_REG_HANDLE) &&
+	    size <= efa_env.efa_max_gdrcopy_from_hmem_size) {
 		switch (iface) {
-		/* TODO: Fine tune the max data size to switch from gdrcopy to cudaMemcpy */
 		case FI_HMEM_CUDA:
 		case FI_HMEM_ROCR:
 			efa_rdm_tracepoint(dev_reg_copy_from_hmem, iface, dest, src, size, hmem_data);

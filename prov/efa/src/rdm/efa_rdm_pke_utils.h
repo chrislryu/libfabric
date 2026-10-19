@@ -139,7 +139,14 @@ efa_rdm_pke_copy_from_hmem_iov(struct efa_rdm_mr *iov_mr, struct efa_rdm_pke *pk
 {
 	size_t copied;
 
-	if (iov_mr && (iov_mr->flags & OFI_HMEM_DATA_DEV_REG_HANDLE)) {
+	/*
+	 * gdrcopy reads device memory through uncached PCIe reads: cheaper than a
+	 * cudaMemcpy call for a few bytes, much slower in bulk. Decide on the size of
+	 * the whole message rather than of this packet's payload, which is at most an
+	 * MTU and would always fall under the limit.
+	 */
+	if (iov_mr && (iov_mr->flags & OFI_HMEM_DATA_DEV_REG_HANDLE) &&
+	    ope->total_len <= efa_env.efa_max_gdrcopy_from_hmem_size) {
 		assert(iov_mr->hmem_data);
 		copied = ofi_dev_reg_copy_from_hmem_iov(pke->wiredata + payload_offset,
 							data_size, iov_mr->efa_mr.iface,
