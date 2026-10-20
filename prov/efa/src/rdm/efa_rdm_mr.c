@@ -526,12 +526,16 @@ static void efa_rdm_mr_hmem_setup(struct efa_rdm_mr *efa_rdm_mr,
 		/*
 		 * gdrcopy pins by virtual address. A dmabuf registration names the
 		 * address the application maps the region at (base_addr + offset), so
-		 * it keeps the gdrcopy handle too; without an address it goes without.
+		 * it keeps the gdrcopy handle too where the EFA device cannot reach
+		 * CUDA memory and every transfer is copied through host bounce
+		 * buffers. Elsewhere the device moves bulk data itself and the pin
+		 * would mostly spend BAR1 space. Without an address it goes without.
 		 */
 		struct iovec mr_iov = { 0 };
 
 		if (flags & FI_MR_DMABUF) {
-			if (attr->dmabuf->base_addr)
+			if (attr->dmabuf->base_addr &&
+			    !g_efa_hmem_info[FI_HMEM_CUDA].p2p_supported_by_device)
 				ofi_mr_get_iov_from_dmabuf(&mr_iov, attr->dmabuf, 1);
 		} else
 			mr_iov = *attr->mr_iov;
